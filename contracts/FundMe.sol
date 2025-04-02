@@ -13,18 +13,18 @@ contract FundMe {
     uint256 constant MINIMUN_VALUE = 1 * 10**18; //wei
 
     // chainlink提供的dataFeed服务 获取美元价格
-    AggregatorV3Interface internal dataFeed;
+    AggregatorV3Interface public  dataFeed;
 
     uint256 constant TARGET = 2 * 10**18;
-    address owner;
+    address public  owner;
 
     uint256 deploymentTimestamp;
     uint256 lockTime;
 
-    constructor(uint256 _lockTime) {
+    constructor(uint256 _lockTime,address datafeedAddr) {
         // Sepolia test
         dataFeed = AggregatorV3Interface(
-            0x694AA1769357215DE4FAC081bf1f309aDC325306
+            datafeedAddr
         );
 
         owner = msg.sender;

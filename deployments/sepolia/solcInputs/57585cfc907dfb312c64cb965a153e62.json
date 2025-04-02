@@ -1,0 +1,39 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// solhint-disable-next-line interface-starts-with-i\ninterface AggregatorV3Interface {\n  function decimals() external view returns (uint8);\n\n  function description() external view returns (string memory);\n\n  function version() external view returns (uint256);\n\n  function getRoundData(\n    uint80 _roundId\n  ) external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);\n\n  function latestRoundData()\n    external\n    view\n    returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);\n}\n"
+    },
+    "contracts/FundMe.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.20;\n\nimport {AggregatorV3Interface} from \"@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol\";\n\n//1.创建一个收款函数\n//2.记录投资人并且查看\n//3.在锁定期达到目标值，生产商可以提款\n//4.在锁定期没有达到目标值，投资人在锁定期以后可以退款\ncontract FundMe {\n    mapping(address => uint256) public funderToAmount;\n\n    uint256 constant MINIMUN_VALUE = 1 * 10**18; //wei\n\n    // chainlink提供的dataFeed服务 获取美元价格\n    AggregatorV3Interface public  dataFeed;\n\n    uint256 constant TARGET = 2 * 10**18;\n    address public  owner;\n\n    uint256 deploymentTimestamp;\n    uint256 lockTime;\n\n    constructor(uint256 _lockTime,address datafeedAddr) {\n        // Sepolia test\n        dataFeed = AggregatorV3Interface(\n            datafeedAddr\n        );\n\n        owner = msg.sender;\n        deploymentTimestamp = block.timestamp;\n        lockTime = _lockTime;\n    }\n\n    function fund() external payable {\n        require(convertEthToUsd(msg.value) >= MINIMUN_VALUE,\"You don't have enough money\");\n        require(block.timestamp < deploymentTimestamp + lockTime,\"window is closed\");\n        funderToAmount[msg.sender] = msg.value;\n    }\n\n    /**\n     * Returns the latest answer.\n     */\n    function getChainlinkDataFeedLatestAnswer() public view returns (int256) {\n        // prettier-ignore\n        (\n            /* uint80 roundID */,\n            int answer,\n            /*uint startedAt*/,\n            /*uint timeStamp*/,\n            /*uint80 answeredInRound*/\n        ) = dataFeed.latestRoundData();\n        return answer;\n    }\n\n    function convertEthToUsd(uint256 ethAmount)\n        internal\n        view\n        returns (uint256)\n    {\n        uint256 ethPrice = uint256(getChainlinkDataFeedLatestAnswer());\n        return (ethAmount * ethPrice) / (10**8);\n    }\n\n    function getFund() external windowClose onlyOwner{\n        require(convertEthToUsd(address(this).balance) >= TARGET,\"Target is not reached!\");\n\n        // transfer: transfer ETH and revert if tx failed\n        // payable(msg.sender).transfer(address(this).balance);\n        //send: transfer ETH and return false if failed\n        // bool success = payable(msg.sender).send(address(this).balance);\n        //call: transfer ETH with data retrun value of function and bool\n        bool success;\n        (success, ) = payable(msg.sender).call{value: address(this).balance}(\"\");\n    }\n\n    function transferOwnership(address newOwner) public onlyOwner {\n        owner = newOwner;\n    }\n\n    function reFund() external windowClose {\n        require(convertEthToUsd(address(this).balance) < TARGET,\"Target is reached\");\n\n        require(funderToAmount[msg.sender] != 0, \"there is no fund for you \");\n        bool success;\n        (success, ) = payable(msg.sender).call{value: funderToAmount[msg.sender]}(\"\");\n        require(success, \"transfer tx failed\");\n        funderToAmount[msg.sender] = 0;\n    }\n\n    modifier windowClose() {\n        require(block.timestamp >= deploymentTimestamp + lockTime,\"window is not closed\");\n        _;\n    }\n\n    modifier onlyOwner() {\n        require(msg.sender == owner,\"this function can only be called by owner \");\n        _;\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "evmVersion": "paris",
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
